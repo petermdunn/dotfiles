@@ -114,7 +114,7 @@ cursor-scroll = ns-resize
 
 [module/currentplaying]
 type = custom/script
-exec = ~/.config/polybar/currentplaying.sh
+exec = ~/bin/currentplaying
 interval = 1
 
 [module/xwindow]
