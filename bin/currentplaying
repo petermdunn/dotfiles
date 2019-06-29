@@ -1,7 +1,7 @@
 #!/bin/bash
 #song=$( mocp -i | grep "^Title" | cut -d: -f2 )
-song=$( mocp -Q "%title" )
-file=$( mocp -Q "%file" )
+song="$( mocp -Q \"%title\" )"
+file="$( mocp -Q \"%file\" )"
 
 if [[ -z "${song}" ]]; then
   output=$file
