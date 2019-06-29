@@ -100,4 +100,10 @@ source $ZSH/oh-my-zsh.sh
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 alias nv="nvim"
 # dotfile alias
-alias config='/usr/bin/git --git-dir=$HOME/.cfg/ --work-tree=$HOME'
+alias dotfiles='/usr/bin/git --git-dir=$HOME/.cfg/ --work-tree=$HOME'
+alias d='config'
+alias da='config add'
+alias dr='config rm'
+alias dc='config commit'
+alias ds='config status'
+alias dp='config push'
