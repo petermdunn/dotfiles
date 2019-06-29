@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+
+# -----------------------------------------------------------------------------
+# Copyright 2019 Dave Jarvis
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+# OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+# -----------------------------------------------------------------------------
+
+source build-template
+
+DEPENDENCIES=(
+  "inotifywait,https://github.com/rvoicilas/inotify-tools/wiki"
+  "context,https://wiki.contextgarden.net"
+  "pandoc,https://www.pandoc.org"
+  "gs,https://www.ghostscript.com"
+)
+
+ARGUMENTS+=(
+  "-f,--filename,Output PDF file name"
+)
+
+# -----------------------------------------------------------------------------
+# Perform all commands that the script requires.
+#
+# @return 0 - Indicate to terminate the script with non-zero exit level
+# @return 1 - All tasks completed successfully (default)
+# -----------------------------------------------------------------------------
+execute() {
+  local -r await=close_write,delete
+
+  $log "Await file modifications in ${SCRIPT_DIR}"
+  inotifywait -q -e "${await}" -m . styles | \
+  while read -r directory event filename; do
+    if [[ ! "${event}" == *ISDIR* ]] && filter "${filename}"; then
+      $log "${directory}${filename} (${event})"
+      build_document
+    fi
+  done
+
+  return 1
+}
+
+# -----------------------------------------------------------------------------
+# Determine whether the given filename is Markdown or TeX.
+#
+# @param $1 - The filename to check.
+#
+# @return 0 - The filename passes the filter.
+# @return 1 - The filename does not pass through the filter.
+# -----------------------------------------------------------------------------
+filter() {
+  [[ "${1,,}" == *\.*md || "${1,,}" == *\.tex ]]
+
+  return $?
+}
+
+# -----------------------------------------------------------------------------
+# Builds the document; called after a Markdown file update or delete event.
+#
+# Requires that Markdown filenames be named consecutively with zero padding.
+# Build artefacts are stored in the aptly named artefacts directory.
+# -----------------------------------------------------------------------------
+build_document() {
+  local -r DIR_BUILD="artefacts"
+  mkdir -p "${DIR_BUILD}"
+
+  local -r FILE_MAIN_PREFIX="main"
+  local -r FILE_BODY_PREFIX="${DIR_BUILD}/body"
+
+  local -r FILE_CAT="${FILE_BODY_PREFIX}.md"
+  local -r FILE_TEX="${FILE_BODY_PREFIX}.tex"
+  local -r FILE_PDF="${FILE_BODY_PREFIX}.pdf"
+  local -r FILE_DST="$(basename "${ARG_FILE_OUTPUT}" .pdf).pdf"
+
+  $log "Concatenate into ${FILE_CAT}"
+  cat ./??.md > "${FILE_CAT}"
+
+  $log "Generate ${FILE_TEX}"
+  pandoc --to context "${FILE_CAT}" > "${FILE_TEX}"
+
+  $log "Generate ${FILE_PDF}"
+  context --nonstopmode --batchmode --purgeall \
+    --path=artefacts,styles \
+    "${FILE_MAIN_PREFIX}.tex" > /dev/null 2>&1
+
+  $log "Rename ${FILE_MAIN_PREFIX}.pdf to ${FILE_DST}"
+  mv "${FILE_MAIN_PREFIX}.pdf" "${FILE_DST}"
+}
+
+# -----------------------------------------------------------------------------
+# Parses a single command-line argument. This must return a value greater
+# than or equal to 1, otherwise parsing the command-line arguments will
+# loop indefinitely.
+#
+# @return The number of arguments to consume (1 by default).
+# -----------------------------------------------------------------------------
+argument() {
+  local consume=1
+
+  case "$1" in
+    -f|--filename)
+      ARG_FILE_OUTPUT="$2"
+      consume=2
+    ;;
+  esac
+
+  return ${consume}
+}
+
+ARG_FILE_OUTPUT="output"
+
+main "$@"
+

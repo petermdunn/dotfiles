@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+mtxrun --script fonts --list --all --name "${1}" | cut -d" " -f1
